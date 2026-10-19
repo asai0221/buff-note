@@ -1,6 +1,6 @@
 
 window.BUFF_CONFIG = {
   url: "https://rloctaqozrobnpuwvpbj.supabase.co",
-  publishableKey: "ここに実際のPublishable keyを貼り付ける"
+  publishableKey: "sb_publishable_BB6hOKHGCfqQMJCVrJdpFA_ljXxB48s"
 };
 
