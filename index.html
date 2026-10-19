@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>バフ管理ノート</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#e9edf5;background:#11151d}
+*{box-sizing:border-box}body{margin:0}header{padding:28px 20px;background:#1a2130;border-bottom:1px solid #30394b}
+.wrap{max-width:1050px;margin:auto;padding:0 18px}h1{margin:0 0 8px;font-size:clamp(25px,4vw,34px)}header p{margin:0;color:#aab5c8}
+main{max-width:1050px;margin:22px auto;padding:0 18px;display:grid;grid-template-columns:320px 1fr;gap:20px}
+.panel{background:#1a2130;border:1px solid #30394b;border-radius:16px;padding:18px;align-self:start}
+h2{font-size:18px;margin:0 0 15px}label{display:block;font-size:13px;color:#b9c4d6;margin:12px 0 6px}
+input,select,textarea{width:100%;padding:11px 12px;background:#111722;border:1px solid #3a455b;color:#eef2fa;border-radius:9px;font:inherit}
+textarea{min-height:100px;resize:vertical}button{border:0;border-radius:9px;padding:10px 13px;font:inherit;font-weight:650;cursor:pointer}
+.primary{background:#7c9cff;color:#10172a;width:100%;margin-top:15px}.secondary{background:#30394b;color:#edf2fc}.danger{background:#4a2931;color:#ffdce1}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.filters button.active{background:#7c9cff;color:#11172a}
+.topline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.topline h2{margin:0}
+#cards{display:grid;gap:12px}.card{background:#1a2130;border:1px solid #30394b;border-radius:13px;padding:15px}
+.cardhead{display:flex;justify-content:space-between;gap:12px;align-items:start}.card h3{margin:0 0 7px;font-size:17px;overflow-wrap:anywhere}
+.tag{font-size:12px;padding:4px 8px;border-radius:99px;background:#30394b;white-space:nowrap}
+.tag.力{background:#4c2b32;color:#ffb4bd}.tag.技{background:#233d5d;color:#b8d8ff}.tag.守り{background:#214637;color:#b6f1d1}
+.meta{font-size:12px;color:#aab5c8;margin:5px 0 10px}.desc{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}
+.actions{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}.empty{color:#aab5c8;text-align:center;padding:35px 10px;border:1px dashed #3a455b;border-radius:12px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.hint{font-size:12px;color:#aab5c8;line-height:1.5;margin-top:12px}
+.status{font-size:12px;color:#aab5c8;line-height:1.5;margin:10px 0}.status:before{content:"● ";color:#e6bb67}.status.ok:before{color:#58d69b}.status.bad:before{color:#ff7785}
+.notice{padding:11px 12px;background:#202b43;border:1px solid #34466c;border-radius:10px;font-size:12px;line-height:1.5;margin:12px 0;color:#cbd6eb;overflow-wrap:anywhere}
+@media(max-width:760px){main{grid-template-columns:1fr}.panel{order:0}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>バフ管理ノート</h1><p>ゲーム制作アイデアを「力・技・守り」に分けて記録する</p></div></header>
+<main>
+<section class="panel">
+<h2 id="formTitle">アイデアを追加</h2>
+<div id="status" class="status">接続設定を確認中…</div>
+<div id="roomBox" class="notice">共有ルームを準備しています…</div>
+<button class="secondary" type="button" id="shareBtn" style="width:100%;margin-bottom:8px">共有URLをコピー</button>
+<form id="buffForm">
+<input type="hidden" id="editId">
+<label for="category">分類</label>
+<select id="category"><option>力</option><option>技</option><option>守り</option></select>
+<label for="name">バフ名（仮名でもOK）</label>
+<input id="name" maxlength="120" placeholder="例：あとで名前を決める" required>
+<label for="effect">効果・アイデア</label>
+<textarea id="effect" maxlength="5000" placeholder="思いついた内容を自由に書く…" required></textarea>
+<label for="duration">効果時間・条件（任意）</label>
+<input id="duration" maxlength="500" placeholder="例：10秒 / HPが半分以下のとき">
+<label for="notes">追加メモ（任意）</label>
+<textarea id="notes" maxlength="5000" placeholder="演出、調整案、実装メモなど"></textarea>
+<button class="primary" type="submit" id="saveBtn">メモを保存</button>
+<div class="tools"><button class="secondary" type="button" id="cancelBtn" hidden>編集をキャンセル</button><button class="secondary" type="button" id="exportBtn">JSONでバックアップ</button></div>
+<p class="hint">メモはオンラインで共有されます。同じ共有URLを開いたメンバーに変更が自動で反映されます。URLはチーム内だけで共有してください。</p>
+</form>
+</section>
+<section>
+<div class="topline"><h2>保存したアイデア</h2><span id="count" class="tag">0件</span></div>
+<div class="filters" id="filters">
+<button class="secondary active" data-filter="すべて">すべて</button>
+<button class="secondary" data-filter="力">力</button>
+<button class="secondary" data-filter="技">技</button>
+<button class="secondary" data-filter="守り">守り</button>
+</div>
+<input id="search" placeholder="名前・効果・メモを検索…" style="margin-bottom:14px">
+<div id="cards"><div class="empty">共有データを読み込んでいます…</div></div>
+<div class="tools"><button class="secondary" id="exportTxt">テキストで書き出す</button><button class="danger" id="clearAll">この共有ルームのメモをすべて削除</button></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+<script>
+(() => {
+const $=id=>document.getElementById(id);
+const cfg=window.BUFF_CONFIG||{};
+let db=null, channel=null, items=[], filter='すべて', editId=null, roomId='', refreshTimer=null;
+const setStatus=(msg,cls='')=>{$('status').textContent=msg;$('status').className='status '+cls};
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function getRoom(){
+ const params=new URLSearchParams(location.hash.slice(1));let r=params.get('room');
+ if(!r){const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);r=[...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');history.replaceState(null,'',location.pathname+location.search+'#room='+r)}
+ if(!/^[a-f0-9]{48}$/.test(r)) { alert('共有URLの形式が正しくありません。サイトURLを開き直してください。'); throw new Error('Invalid room token'); }
+ return r;
+}
+function shareUrl(){return location.href}
+async function copyText(text){try{await navigator.clipboard.writeText(text);alert('コピーしました！')}catch{prompt('この内容をコピーしてください',text)}}
+$('shareBtn').onclick=()=>copyText(shareUrl());
+roomId=getRoom();$('roomBox').textContent='共有ルーム：'+roomId.slice(0,8)+'…（共有URLに含まれます）';
+function render(){
+ const q=$('search').value.trim().toLowerCase();
+ const list=items.filter(x=>(filter==='すべて'||x.category===filter)&&[x.name,x.effect,x.duration,x.notes,x.category].join(' ').toLowerCase().includes(q));
+ $('count').textContent=`${items.length}件`;const cards=$('cards');
+ if(!list.length){cards.innerHTML='<div class="empty">まだアイデアがありません。左のフォームから追加できます。</div>';return}
+ cards.innerHTML=list.slice().sort((a,b)=>new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0)).map(x=>`<article class="card">
+ <div class="cardhead"><div><h3>${escapeHtml(x.name)}</h3><div class="meta">${x.updated_at?new Date(x.updated_at).toLocaleString('ja-JP')+' 更新':''}</div></div><span class="tag ${escapeHtml(x.category)}">${escapeHtml(x.category)}</span></div>
+ <div class="desc">${escapeHtml(x.effect)}</div>${x.duration?`<p class="meta">条件・時間：${escapeHtml(x.duration)}</p>`:''}${x.notes?`<p class="desc" style="margin-top:10px;color:#bac5d7">${escapeHtml(x.notes)}</p>`:''}
+ <div class="actions"><button class="secondary" data-edit="${x.id}">編集</button><button class="secondary" data-copy="${x.id}">内容をコピー</button><button class="danger" data-delete="${x.id}">削除</button></div></article>`).join('');
+}
+function resetForm(){$('buffForm').reset();editId=null;$('editId').value='';$('formTitle').textContent='アイデアを追加';$('saveBtn').textContent='メモを保存';$('cancelBtn').hidden=true}
+async function load(silent=false){
+ if(!db)return;const {data,error}=await db.from('buff_notes').select('*').eq('room_id',roomId).order('updated_at',{ascending:false});
+ if(error){setStatus('読み込みエラー：'+error.message,'bad');if(!items.length)$('cards').innerHTML='<div class="empty">データを読み込めません。設定手順と接続情報を確認してください。</div>';return}
+ items=data||[];render();setStatus('共有中 — 変更は自動で同期されます','ok');
+}
+function announce(){if(channel)channel.send({type:'broadcast',event:'refresh',payload:{at:Date.now()}}).catch(()=>{});}
+$('buffForm').addEventListener('submit',async e=>{
+ e.preventDefault();if(!db){alert('データベースの初期設定が必要です。READMEの手順を確認してください。');return}
+ const row={category:$('category').value,name:$('name').value.trim(),effect:$('effect').value.trim(),duration:$('duration').value.trim(),notes:$('notes').value.trim(),room_id:roomId,updated_at:new Date().toISOString()};
+ $('saveBtn').disabled=true;const oldLabel=$('saveBtn').textContent;$('saveBtn').textContent='保存中…';
+ let result=editId?await db.from('buff_notes').update(row).eq('id',editId).eq('room_id',roomId):await db.from('buff_notes').insert(row);
+ $('saveBtn').disabled=false;$('saveBtn').textContent=oldLabel;
+ if(result.error){setStatus('保存エラー：'+result.error.message,'bad');alert('保存できませんでした。SQL設定や接続情報を確認してください。');return}
+ resetForm();await load();announce();
+});
+$('cancelBtn').onclick=resetForm;
+$('filters').addEventListener('click',e=>{const b=e.target.closest('button[data-filter]');if(!b)return;filter=b.dataset.filter;document.querySelectorAll('#filters button').forEach(x=>x.classList.toggle('active',x===b));render()});
+$('search').addEventListener('input',render);
+$('cards').addEventListener('click',async e=>{
+ const edit=e.target.closest('[data-edit]')?.dataset.edit,del=e.target.closest('[data-delete]')?.dataset.delete,cp=e.target.closest('[data-copy]')?.dataset.copy;
+ if(edit){const x=items.find(a=>a.id===edit);if(!x)return;editId=x.id;$('editId').value=x.id;$('category').value=x.category;$('name').value=x.name;$('effect').value=x.effect;$('duration').value=x.duration||'';$('notes').value=x.notes||'';$('formTitle').textContent='アイデアを編集';$('saveBtn').textContent='変更を保存';$('cancelBtn').hidden=false;window.scrollTo({top:0,behavior:'smooth'})}
+ if(del){const x=items.find(a=>a.id===del);if(!x||!confirm(`「${x.name}」を削除しますか？`))return;const {error}=await db.from('buff_notes').delete().eq('id',del).eq('room_id',roomId);if(error){alert('削除できませんでした：'+error.message);return}await load();announce()}
+ if(cp){const x=items.find(a=>a.id===cp);if(x)copyText(`【${x.category}】${x.name}\n効果：${x.effect}\n条件・時間：${x.duration||'未記入'}\n追加メモ：${x.notes||'未記入'}`)}
+});
+$('exportBtn').onclick=()=>download('buff-notes-backup.json',JSON.stringify(items,null,2),'application/json');
+$('exportTxt').onclick=()=>{const t=items.map(x=>`【${x.category}】${x.name}\n効果：${x.effect}\n条件・時間：${x.duration||'未記入'}\n追加メモ：${x.notes||'未記入'}\n`).join('\n--------------------\n\n');download('buff-notes.txt',t,'text/plain;charset=utf-8')};
+$('clearAll').onclick=async()=>{if(!items.length){alert('削除するメモがありません');return}if(confirm('この共有ルームのメモをすべて削除します。この操作は取り消せません。続けますか？')){const {error}=await db.from('buff_notes').delete().eq('room_id',roomId);if(error){alert('削除できませんでした：'+error.message);return}resetForm();await load();announce()}};
+function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+async function start(){
+ if(!cfg.url||!cfg.publishableKey||cfg.url.includes('YOUR_')||cfg.publishableKey.includes('YOUR_')){setStatus('初期設定が必要です','bad');$('cards').innerHTML='<div class="empty">READMEの手順でSupabaseを設定し、config.jsにURLとPublishable keyを入力してください。</div>';return}
+ if(!window.supabase){setStatus('通信ライブラリを読み込めません','bad');return}
+ db=window.supabase.createClient(cfg.url,cfg.publishableKey,{global:{headers:{'x-room-token':roomId}}});await load();
+ channel=db.channel('buff-room-'+roomId,{config:{broadcast:{self:false}}});
+ channel.on('broadcast',{event:'refresh'},()=>load(true)).subscribe(s=>{if(s==='SUBSCRIBED')setStatus('共有中 — 変更は自動で同期されます','ok');else if(s==='CHANNEL_ERROR'||s==='TIMED_OUT')setStatus('リアルタイム接続を再試行中…','bad')});
+ // Broadcast for quick updates plus periodic refresh as a fallback.
+ refreshTimer=setInterval(()=>load(true),10000);
+}
+start();
+})();
+</script>
+</body>
+</html>
